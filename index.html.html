@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Entregas Mococa</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0e1117;--surface:#161b27;--surface2:#1e253a;
+  --border:#2a3150;--accent:#3b82f6;--accent2:#60a5fa;
+  --success:#22c55e;--warning:#f59e0b;--danger:#ef4444;
+  --text:#e2e8f0;--muted:#64748b;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+#map{position:absolute;inset:0;z-index:1;}
+.leaflet-container{background:#1a1f2e;}
+
+#header{position:absolute;top:0;left:0;right:0;z-index:10;background:rgba(14,17,23,0.97);border-bottom:1px solid var(--border);padding:10px 12px;}
+.hrow{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.logo{width:30px;height:30px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.htitle{font-size:15px;font-weight:700;color:var(--text);}
+.hbadge{font-size:11px;background:rgba(59,130,246,.2);color:var(--accent2);padding:2px 8px;border-radius:6px;border:1px solid rgba(59,130,246,.25);}
+.hstops{font-size:12px;color:var(--muted);margin-left:auto;}
+
+.input-row{display:flex;gap:6px;}
+#addr-input{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:11px 12px;font-size:15px;color:var(--text);outline:none;-webkit-appearance:none;transition:border-color .15s;}
+#addr-input:focus{border-color:var(--accent);}
+#addr-input::placeholder{color:var(--muted);}
+#num-input{width:68px;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:11px 8px;font-size:15px;color:var(--text);outline:none;text-align:center;-webkit-appearance:none;transition:border-color .15s;}
+#num-input:focus{border-color:var(--accent);}
+#num-input::placeholder{color:var(--muted);font-size:12px;}
+
+#suggestions{margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:none;max-height:220px;overflow-y:auto;}
+.sug-item{padding:11px 14px;display:flex;align-items:flex-start;gap:10px;cursor:pointer;border-bottom:1px solid var(--border);-webkit-tap-highlight-color:transparent;}
+.sug-item:last-child{border-bottom:none;}
+.sug-item:active,.sug-item:hover{background:var(--surface2);}
+.sug-main{font-size:14px;font-weight:600;color:var(--text);}
+.sug-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.sug-msg{padding:13px 14px;font-size:13px;color:var(--muted);text-align:center;line-height:1.7;}
+
+#bottom{position:absolute;bottom:0;left:0;right:0;z-index:10;background:rgba(14,17,23,0.97);border-top:1px solid var(--border);padding:10px 12px 18px;transform:translateY(0);transition:transform .3s;}
+#bottom.collapsed{transform:translateY(calc(100% - 50px));}
+#handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 10px;cursor:pointer;}
+
+#stops-list{max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
+.stop-card{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;display:flex;align-items:flex-start;gap:8px;}
+.dot{width:24px;height:24px;border-radius:50%;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.dot.o{background:var(--success);}
+.dot.m{background:var(--accent);}
+.dot.l{background:var(--warning);}
+.sinfo{flex:1;min-width:0;}
+.sname{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ssub{font-size:11px;color:var(--muted);margin-top:1px;}
+.scoord{font-size:10px;color:var(--accent);font-family:monospace;margin-top:2px;}
+.sdist{font-size:11px;color:var(--accent2);font-weight:600;margin-top:3px;}
+.sdel{background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:2px;flex-shrink:0;}
+.empty{text-align:center;padding:16px 0;color:var(--muted);font-size:13px;line-height:1.6;}
+
+#stats{display:none;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
+.stat{background:var(--surface2);border-radius:8px;padding:8px;text-align:center;}
+.sv{font-size:16px;font-weight:700;color:var(--accent2);}
+.sl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+
+#actions{display:flex;gap:6px;}
+#btn-opt{flex:1;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;transition:filter .15s;}
+#btn-opt:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;}
+#btn-gm{background:#1a73e8;color:#fff;border:none;border-radius:11px;padding:13px 14px;font-size:16px;cursor:pointer;display:none;-webkit-tap-highlight-color:transparent;}
+#btn-clr{background:var(--surface2);color:var(--danger);border:1px solid var(--border);border-radius:11px;padding:13px 14px;font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:8px 16px;font-size:13px;color:var(--text);z-index:999;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;max-width:90vw;text-align:center;line-height:1.5;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle;}
+.spin-accent{border-top-color:var(--accent);border-color:var(--border);}
+
+.leaflet-tile{filter:brightness(.88) saturate(.85);}
+.leaflet-popup-content-wrapper{background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+.leaflet-popup-content{color:var(--text);font-size:13px;font-weight:600;margin:10px 14px;}
+.leaflet-popup-tip{background:var(--surface);}
+.leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important;}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="header">
+  <div class="hrow">
+    <div class="logo">🚚</div>
+    <span class="htitle">Entregas</span>
+    <span class="hbadge">📍 Mococa - SP</span>
+    <span class="hstops" id="hstops">0 paradas</span>
+  </div>
+  <div class="input-row">
+    <input id="addr-input" type="text" placeholder="Rua, praça, bairro..." autocomplete="off" autocorrect="off" spellcheck="false">
+    <input id="num-input" type="text" inputmode="numeric" placeholder="Nº">
+  </div>
+  <div id="suggestions"></div>
+</div>
+
+<div id="bottom" class="collapsed">
+  <div id="handle"></div>
+  <div id="stops-list"><div class="empty">Adicione endereços acima para começar 📦</div></div>
+  <div id="stats">
+    <div class="stat"><div class="sv" id="sv-dist">—</div><div class="sl">km total</div></div>
+    <div class="stat"><div class="sv" id="sv-time">—</div><div class="sl">tempo est.</div></div>
+    <div class="stat"><div class="sv" id="sv-stops">—</div><div class="sl">paradas</div></div>
+  </div>
+  <div id="actions">
+    <button id="btn-opt" disabled>⚡ Calcular Rota</button>
+    <button id="btn-gm" title="Abrir no Google Maps">🗺️</button>
+    <button id="btn-clr">🗑️</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────
+// CONFIGURAÇÃO
+// ─────────────────────────────────────────
+
+// OpenRouteService — chave pública gratuita (5000 req/dia)
+const ORS_KEY = '5b3ce3597851110001cf6248a5a1d9a073ee4b26b80bd4aebb70f5c5';
+
+// Centro de Mococa-SP
+const MOCOCA = { lat: -21.4786, lon: -47.0067, zoom: 14 };
+
+// ─────────────────────────────────────────
+// MAPA
+// ─────────────────────────────────────────
+const map = L.map('map', {
+  center: [MOCOCA.lat, MOCOCA.lon],
+  zoom: MOCOCA.zoom,
+  zoomControl: true,
+  attributionControl: false
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+function fixMap() {
+  document.getElementById('map').style.top = document.getElementById('header').offsetHeight + 'px';
+}
+fixMap();
+setTimeout(() => { map.invalidateSize(); fixMap(); }, 300);
+
+// ─────────────────────────────────────────
+// ESTADO
+// ─────────────────────────────────────────
+const S = {
+  stops: [],       // { name, sub, lat, lon }
+  markers: [],
+  routeLayer: null,
+  debounce: null,
+  busy: false
+};
+
+// ─────────────────────────────────────────
+// ÍCONES
+// ─────────────────────────────────────────
+function mkIcon(label, color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="background:${color};color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.55);">${label}</div>`,
+    iconSize: [32,32], iconAnchor: [16,16], popupAnchor: [0,-18]
+  });
+}
+
+// ─────────────────────────────────────────
+// GEOCODING — Photon (dados OSM, sem rate limit agressivo)
+// Foca em Mococa usando bbox e location bias
+// ─────────────────────────────────────────
+async function geocode(addr, num) {
+  const q = num ? `${addr} ${num} Mococa` : `${addr} Mococa`;
+
+  // Photon: motor de geocoding moderno baseado em OSM
+  // location bias em Mococa + bbox restrito à região
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}`
+    + `&lat=${MOCOCA.lat}&lon=${MOCOCA.lon}`  // bias de localização
+    + `&limit=6`
+    + `&lang=pt`;
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    return data.features || [];
+  } catch(e) {
+    console.error('Geocode error:', e);
+    // fallback para Nominatim se Photon falhar
+    return await geocodeNominatim(addr, num);
+  }
+}
+
+async function geocodeNominatim(addr, num) {
+  const q = num ? `${addr}, ${num}, Mococa, SP` : `${addr}, Mococa, SP`;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=br&limit=6&addressdetails=1&accept-language=pt-BR`;
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'EntregasMococa/1.0' } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    // converte para formato Photon
+    return data.map(r => ({
+      geometry: { coordinates: [+r.lon, +r.lat] },
+      properties: {
+        name: r.address?.road || r.address?.suburb || r.display_name.split(',')[0],
+        street: r.address?.road,
+        housenumber: r.address?.house_number,
+        suburb: r.address?.suburb,
+        city: r.address?.city || r.address?.town,
+        state: r.address?.state,
+        _nominatim: true
+      }
+    }));
+  } catch { return []; }
+}
+
+function parseFeature(f, numHint) {
+  const p = f.properties || {};
+  const lon = f.geometry.coordinates[0];
+  const lat  = f.geometry.coordinates[1];
+
+  // Monta nome legível
+  const street = p.street || p.name || '';
+  const num    = p.housenumber || numHint || '';
+  const name   = num ? `${street}, ${num}` : street || p.name || 'Local';
+
+  // Sub-localização
+  const parts = [];
+  if (p.suburb && p.suburb !== name) parts.push(p.suburb);
+  if (p.district && p.district !== p.suburb) parts.push(p.district);
+  if (p.city || p.town) parts.push(p.city || p.town);
+
+  // Ícone por tipo
+  let icon = '📍';
+  if (num) icon = '🏠';
+  else if (p.type === 'square' || p.osm_value === 'square') icon = '🏛️';
+  else if (['neighbourhood','suburb','quarter'].includes(p.type)) icon = '🏘️';
+
+  // Prioridade: resultados de Mococa sobem
+  const isMococa = (p.city||p.town||p.suburb||'').toLowerCase().includes('mococa')
+                || (JSON.stringify(p)).toLowerCase().includes('mococa');
+
+  return { name, sub: parts.join(', ') || 'Mococa - SP', lat, lon, icon, isMococa };
+}
+
+// ─────────────────────────────────────────
+// SEARCH UI
+// ─────────────────────────────────────────
+const addrIn = document.getElementById('addr-input');
+const numIn  = document.getElementById('num-input');
+const sugEl  = document.getElementById('suggestions');
+
+function doSearch() {
+  const addr = addrIn.value.trim();
+  const num  = numIn.value.trim();
+  clearTimeout(S.debounce);
+  if (addr.length < 2) { hideSug(); return; }
+
+  sugEl.style.display = 'block';
+  sugEl.innerHTML = `<div class="sug-msg"><span class="spin spin-accent"></span>&nbsp; Buscando em Mococa...</div>`;
+
+  S.debounce = setTimeout(async () => {
+    if (S.busy) return;
+    const a = addrIn.value.trim(), n = numIn.value.trim();
+    if (a.length < 2) { hideSug(); return; }
+
+    S.busy = true;
+    const features = await geocode(a, n);
+    S.busy = false;
+
+    if (addrIn.value.trim() !== a) return;
+
+    if (!features.length) {
+      sugEl.innerHTML = `<div class="sug-msg">
+        Nenhum resultado para "<b>${a}</b>".<br>
+        <small>Tente: "Campos Salles" · "XV de Novembro" · "José Manoel"</small>
+      </div>`;
+      return;
+    }
+
+    // Ordena: Mococa primeiro
+    const parsed = features.map(f => parseFeature(f, n));
+    parsed.sort((a,b) => (b.isMococa?1:0) - (a.isMococa?1:0));
+
+    sugEl.innerHTML = parsed.map((p, i) =>
+      `<div class="sug-item" data-i="${i}">
+        <span style="font-size:16px;flex-shrink:0;margin-top:1px;">${p.icon}</span>
+        <div>
+          <div class="sug-main">${p.name}</div>
+          <div class="sug-sub">${p.sub}</div>
+        </div>
+      </div>`
+    ).join('');
+
+    parsed.forEach((p, i) => {
+      sugEl.querySelectorAll('.sug-item')[i].addEventListener('click', () => {
+        addStop(p);
+        addrIn.value = ''; numIn.value = '';
+        hideSug(); addrIn.focus();
+      });
+    });
+  }, 550);
+}
+
+addrIn.addEventListener('input', doSearch);
+numIn.addEventListener('change', doSearch);
+numIn.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.addEventListener('click', e => { if (!e.target.closest('#header')) hideSug(); });
+function hideSug() { sugEl.style.display='none'; sugEl.innerHTML=''; }
+
+// ─────────────────────────────────────────
+// PARADAS
+// ─────────────────────────────────────────
+function addStop(p) {
+  S.stops.push(p);
+  clearRoute();
+  buildMarkers();
+  map.flyTo([p.lat, p.lon], 17, { duration: 0.8 });
+  openPanel();
+  renderList();
+  toast('"' + p.name + '" adicionado!');
+}
+
+function delStop(i) {
+  S.stops.splice(i, 1);
+  clearRoute(); buildMarkers(); renderList();
+}
+
+function buildMarkers() {
+  S.markers.forEach(m => map.removeLayer(m));
+  S.markers = [];
+  S.stops.forEach((s, i) => {
+    const n = S.stops.length;
+    const isF = i === 0, isL = i === n-1 && n > 1;
+    const color = isF ? '#22c55e' : isL ? '#f59e0b' : '#3b82f6';
+    const lbl   = isF ? '★' : i + 1;
+    S.markers.push(
+      L.marker([s.lat, s.lon], { icon: mkIcon(lbl, color) })
+        .addTo(map)
+        .bindPopup(`<b>${s.name}</b>`)
+    );
+  });
+}
+
+// ─────────────────────────────────────────
+// PAINEL
+// ─────────────────────────────────────────
+const bottom = document.getElementById('bottom');
+document.getElementById('handle').addEventListener('click', () => {
+  bottom.classList.toggle('collapsed');
+  setTimeout(() => map.invalidateSize(), 320);
+});
+function openPanel() {
+  bottom.classList.remove('collapsed');
+  setTimeout(() => map.invalidateSize(), 320);
+}
+
+function renderList() {
+  const n = S.stops.length;
+  document.getElementById('hstops').textContent = n + (n === 1 ? ' parada' : ' paradas');
+  document.getElementById('btn-opt').disabled = n < 2;
+  const el = document.getElementById('stops-list');
+  if (!n) {
+    el.innerHTML = '<div class="empty">Adicione endereços acima para começar 📦</div>';
+    return;
+  }
+  el.innerHTML = S.stops.map((s, i) => {
+    const n2 = S.stops.length;
+    const isF = i===0, isL = i===n2-1 && n2>1;
+    const dc = isF?'o':isL?'l':'m';
+    const dl = isF?'★':i+1;
+    return `<div class="stop-card">
+      <div class="dot ${dc}">${dl}</div>
+      <div class="sinfo">
+        <div class="sname">${s.name}</div>
+        <div class="ssub">${s.sub}</div>
+        <div class="scoord">${s.lat.toFixed(5)}, ${s.lon.toFixed(5)}</div>
+      </div>
+      <button class="sdel" onclick="delStop(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────
+// ROTA REAL — OpenRouteService
+// Pega a rota pelas ruas de verdade
+// ─────────────────────────────────────────
+async function getRoute(stops) {
+  // ORS aceita até 50 waypoints
+  const coords = stops.map(s => [s.lon, s.lat]);
+
+  const body = {
+    coordinates: coords,
+    profile: 'driving-car',
+    format: 'geojson',
+    instructions: false,
+    language: 'pt'
+  };
+
+  const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+    method: 'POST',
+    headers: {
+      'Authorization': ORS_KEY,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error('ORS: ' + err);
+  }
+  return await res.json();
+}
+
+// ─────────────────────────────────────────
+// OTIMIZAÇÃO TSP (menor distância) + Rota real
+// ─────────────────────────────────────────
+function hav(a,b,c,d){const R=6371,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+function buildMat(pts){const n=pts.length,m=Array.from({length:n},()=>new Array(n).fill(0));for(let i=0;i<n;i++)for(let j=0;j<n;j++)if(i!==j)m[i][j]=hav(pts[i].lat,pts[i].lon,pts[j].lat,pts[j].lon);return m;}
+function rd(r,m){return r.reduce((s,_,i)=>i<r.length-1?s+m[r[i]][r[i+1]]:s,0);}
+function nn(m){const n=m.length,v=new Array(n).fill(false),r=[0];v[0]=true;for(let s=1;s<n;s++){let l=r[r.length-1],b=-1,bd=Infinity;for(let j=0;j<n;j++)if(!v[j]&&m[l][j]<bd){b=j;bd=m[l][j];}r.push(b);v[b]=true;}return r;}
+function opt2(r,m){let b=[...r],ok=true;while(ok){ok=false;for(let i=1;i<b.length-1;i++)for(let j=i+1;j<b.length;j++){const n2=[...b.slice(0,i),...b.slice(i,j+1).reverse(),...b.slice(j+1)];if(rd(n2,m)<rd(b,m)){b=n2;ok=true;}}}return b;}
+function brute(m){const n=m.length;function p(a){return a.length<=1?[a]:a.flatMap((v,i)=>p([...a.slice(0,i),...a.slice(i+1)]).map(x=>[v,...x]));}let best=null,bd=Infinity;for(const x of p(Array.from({length:n-1},(_,i)=>i+1))){const r=[0,...x];const d=rd(r,m);if(d<bd){bd=d;best=r;}}return best;}
+
+document.getElementById('btn-opt').addEventListener('click', async () => {
+  const n = S.stops.length;
+  if (n < 2) return;
+
+  const btn = document.getElementById('btn-opt');
+  btn.innerHTML = '<span class="spin"></span> Calculando...';
+  btn.disabled = true;
+
+  try {
+    // 1. Otimiza a ordem (TSP)
+    const mat = buildMat(S.stops);
+    const order = n <= 8 ? brute(mat) : opt2(nn(mat), mat);
+    const orderedStops = order.map(i => S.stops[i]);
+
+    // 2. Busca rota real pelas ruas via ORS
+    toast('Traçando rota pelas ruas...');
+    const geoJson = await getRoute(orderedStops);
+
+    // 3. Extrai dados da rota
+    const seg     = geoJson.features[0];
+    const distKm  = (seg.properties.summary.distance / 1000).toFixed(1);
+    const durMin  = Math.round(seg.properties.summary.duration / 60);
+    const coords  = seg.geometry.coordinates.map(c => [c[1], c[0]]); // [lon,lat] → [lat,lon]
+
+    // 4. Redesenha marcadores na ordem otimizada
+    S.markers.forEach(m => map.removeLayer(m));
+    S.markers = [];
+    orderedStops.forEach((s, pos) => {
+      const isF = pos===0, isL = pos===orderedStops.length-1 && orderedStops.length>1;
+      const color = isF?'#22c55e':isL?'#f59e0b':'#3b82f6';
+      const lbl   = isF?'★':pos+1;
+      S.markers.push(L.marker([s.lat,s.lon],{icon:mkIcon(lbl,color)}).addTo(map).bindPopup(`<b>${s.name}</b>`));
+    });
+
+    // 5. Desenha a rota no mapa
+    clearRouteLayer();
+    S.routeLayer = L.layerGroup([
+      L.polyline(coords, { color:'#1e3a8a', weight:7, opacity:.5, lineCap:'round', lineJoin:'round' }),
+      L.polyline(coords, { color:'#3b82f6', weight:4, opacity:1,  lineCap:'round', lineJoin:'round' })
+    ]).addTo(map);
+    map.fitBounds(L.latLngBounds(coords), { padding:[50,50], maxZoom:16 });
+
+    // 6. Atualiza stats
+    const timeStr = durMin < 60 ? durMin+' min' : Math.floor(durMin/60)+'h'+(durMin%60?(durMin%60)+'m':'');
+    document.getElementById('sv-dist').textContent   = distKm + ' km';
+    document.getElementById('sv-time').textContent   = timeStr;
+    document.getElementById('sv-stops').textContent  = orderedStops.length;
+    document.getElementById('stats').style.display   = 'grid';
+    document.getElementById('btn-gm').style.display  = 'flex';
+
+    // 7. Atualiza lista na ordem otimizada
+    // Reordena S.stops para refletir a rota
+    S.stops = orderedStops;
+    renderList();
+
+    btn.innerHTML = '✔ Rota pronta!';
+    toast('Rota pelas ruas: ' + distKm + ' km · ' + timeStr);
+    setTimeout(() => { btn.innerHTML = '⚡ Calcular Rota'; btn.disabled = false; }, 2500);
+
+  } catch(e) {
+    console.error(e);
+    btn.innerHTML = '⚡ Calcular Rota';
+    btn.disabled = false;
+    toast('Erro ao calcular rota. Verifique sua conexão.');
+  }
+});
+
+// ─────────────────────────────────────────
+// LIMPAR ROTA
+// ─────────────────────────────────────────
+function clearRouteLayer() {
+  if (S.routeLayer) { map.removeLayer(S.routeLayer); S.routeLayer = null; }
+}
+function clearRoute() {
+  clearRouteLayer();
+  document.getElementById('stats').style.display = 'none';
+  document.getElementById('btn-gm').style.display = 'none';
+}
+
+// ─────────────────────────────────────────
+// GOOGLE MAPS — abre com rota na ordem certa
+// ─────────────────────────────────────────
+document.getElementById('btn-gm').addEventListener('click', () => {
+  if (!S.stops.length) return;
+  const pts = S.stops;
+  const o  = `${pts[0].lat},${pts[0].lon}`;
+  const d  = `${pts[pts.length-1].lat},${pts[pts.length-1].lon}`;
+  const wp = pts.slice(1,-1).map(p=>`${p.lat},${p.lon}`).join('|');
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${o}&destination=${d}&travelmode=driving`;
+  if (wp) url += `&waypoints=${wp}`;
+  window.open(url, '_blank');
+});
+
+// ─────────────────────────────────────────
+// LIMPAR TUDO
+// ─────────────────────────────────────────
+document.getElementById('btn-clr').addEventListener('click', () => {
+  if (!S.stops.length) return;
+  if (!confirm('Limpar todas as paradas?')) return;
+  S.stops = [];
+  S.markers.forEach(m => map.removeLayer(m));
+  S.markers = [];
+  clearRoute();
+  renderList();
+  toast('Lista limpa!');
+});
+
+// ─────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+window.addEventListener('resize', () => { fixMap(); setTimeout(() => map.invalidateSize(), 100); });
+</script>
+</body>
+</html>
